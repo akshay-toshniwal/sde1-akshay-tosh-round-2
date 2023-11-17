@@ -10,6 +10,12 @@ services:
       - "5432:5432"
     networks:
       - my_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d mt-pg"]
+      retries: 3
+      interval: 5s
+      timeout: 5s
+  
   mt-mysql:
     build:
       dockerfile: Dockerfile-MySQL
@@ -19,6 +25,35 @@ services:
       - "3306:3306"
     networks:
       - my_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      retries: 3
+      interval: 5s
+      timeout: 5s
+  
+  
+  data-processing:
+    build:
+      dockerfile: Dockerfile-DataProcessing
+    env_file: .env
+    networks:
+      - my_network
+    depends_on:
+      mt-mysql:
+        condition: service_healthy
+      mt-postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+
+  test_runner:
+    build:
+      context: .
+      dockerfile: Dockerfile-DataProcessing
+    volumes:
+      - .:/app
+    command: ["python", "-m", "unittest", "tests.py"]
 
 networks:
   my_network:
+    driver: bridge
